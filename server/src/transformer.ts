@@ -122,8 +122,8 @@ async function transformWithClaude(raw: string): Promise<StructuredIssue> {
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error('[transformer] Claude API error ' + res.status + ':', errText);
-      throw new Error('Claude API ' + res.status);
+      console.error(`[transformer] Claude API error ${res.status}:`, errText);
+      throw new Error(`Claude API ${res.status}`);
     }
 
     const data = (await res.json()) as any;
@@ -143,7 +143,7 @@ async function transformWithOpenAI(raw: string): Promise<StructuredIssue> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + config.openaiApiKey,
+        Authorization: `Bearer ${config.openaiApiKey}`,
       },
       body: JSON.stringify({
         model: 'gpt-4o',
@@ -156,7 +156,7 @@ async function transformWithOpenAI(raw: string): Promise<StructuredIssue> {
     });
 
     if (!res.ok) {
-      throw new Error('OpenAI API ' + res.status);
+      throw new Error(`OpenAI API ${res.status}`);
     }
 
     const data = (await res.json()) as any;
@@ -210,7 +210,7 @@ function parseLLMOutput(content: string, raw: string): StructuredIssue {
 function mockTransform(raw: string): StructuredIssue {
   const lines = raw
     .split('\n')
-    .map((l: string) => l.trim())
+    .map((l) => l.trim())
     .filter(Boolean);
   const summary = lines.shift() || raw.slice(0, 80);
   const description = lines.join('\n') || summary;
@@ -248,13 +248,14 @@ function mockTransform(raw: string): StructuredIssue {
   if (actualMatch) actual_behavior = actualMatch[1].trim();
 
   // Environment detection
+  let environment = '';
   const envTokens: string[] = [];
   if (lower.includes('chrome')) envTokens.push('Chrome');
   if (lower.includes('firefox')) envTokens.push('Firefox');
   if (lower.includes('safari')) envTokens.push('Safari');
   if (lower.includes('production')) envTokens.push('Production');
   if (lower.includes('staging')) envTokens.push('Staging');
-  const environment = envTokens.join(', ');
+  environment = envTokens.join(', ');
 
   return {
     summary,

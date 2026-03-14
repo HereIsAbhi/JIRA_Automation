@@ -1,4 +1,5 @@
 import { config } from './config';
+import { buildWhatfixSystemPrompt } from './whatfixContext';
 
 // ── Attachment type ──────────────────────────────────────────
 
@@ -28,37 +29,9 @@ export type StructuredIssue = {
   attachments: Attachment[];
 };
 
-// ── Claude system prompt ─────────────────────────────────────
+// ── System prompt (Whatfix-enriched) ─────────────────────────
 
-const SYSTEM_PROMPT = `You are a senior engineering project manager.
-Given a raw, informal description of a software issue or feature request,
-produce a well-structured Jira ticket in JSON format.
-
-Return ONLY valid JSON with these exact fields:
-{
-  "summary": "short one-line title (max 120 chars)",
-  "description": "detailed description with context, impact, and technical details",
-  "steps_to_reproduce": "numbered step-by-step instructions to reproduce (for bugs). Use newline chars for steps. Leave empty string for non-bugs",
-  "expected_behavior": "what should happen (for bugs). Leave empty string for non-bugs",
-  "actual_behavior": "what actually happens (for bugs). Leave empty string for non-bugs",
-  "acceptance_criteria": ["list of specific, testable acceptance criteria"],
-  "priority": "one of: Lowest, Low, Medium, High, Highest",
-  "labels": ["relevant labels like bug, frontend, backend, security, performance"],
-  "components": ["affected system components"],
-  "issue_type": "one of: Bug, Task, Story, Improvement",
-  "triage": "one of: Needs Investigation, Confirmed, Cannot Reproduce, Duplicate",
-  "environment": "environment info if mentioned (browser, OS, staging/production), or empty string",
-  "estimated_effort": "estimated effort: S, M, L, or XL"
-}
-
-Rules:
-- Infer priority from urgency cues (crash/500/data loss=High/Highest, cosmetic/typo=Low)
-- Extract steps to reproduce from the text if it is a bug
-- Separate expected vs actual behavior clearly
-- Set triage to "Needs Investigation" by default for bugs, "Confirmed" for features/tasks
-- Detect environment info from text (browser, OS, production/staging mentions)
-- Keep summary concise but descriptive
-- Return ONLY the JSON object, no markdown fences, no explanation`;
+const SYSTEM_PROMPT = buildWhatfixSystemPrompt();
 
 // ── Main transform function ──────────────────────────────────
 

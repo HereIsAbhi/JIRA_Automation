@@ -170,20 +170,24 @@ function parseStrictEdits(text: string): Record<string, string> {
 
 // ── Smart edit: use Claude to interpret free-form edits ──────
 
-const EDIT_PROMPT = `You are an assistant that interprets edit instructions for a Jira issue draft.
+const EDIT_PROMPT = `You are an assistant at **Whatfix** that interprets edit instructions for a Jira issue draft.
 Given the current issue fields and a user's edit instruction in natural language,
 determine which fields should be changed and what the new values should be.
 
+You understand Whatfix products: Flows, Smart Tips, Self Help, Beacons, Launchers, Task List,
+Pop-ups, Analytics, Editor, Quick Capture, Segmentation, Content Aggregation, Whatfix AI,
+Localization, Product Analytics, DAP for Desktop, DAP for Mobile, Mirror.
+
 The editable fields are:
-- summary (string)
+- summary (string) — prefix with module in brackets e.g. [Flows], [Quick Capture]
 - description (string)
 - steps_to_reproduce (string)
 - expected_behavior (string)
 - actual_behavior (string)
 - acceptance_criteria (semicolon-separated list)
 - priority (Lowest, Low, Medium, High, Highest)
-- labels (comma-separated)
-- components (comma-separated)
+- labels (comma-separated) — use Whatfix module labels: flows, smart-tips, self-help, editor, analytics, quick-capture, whatfix-ai, beacons, launchers, task-list, popups, segmentation, mirror, product-analytics, dap-desktop, dap-mobile, customer-reported
+- components (comma-separated) — use Whatfix module components: flows, smart-tips, self-help, editor, analytics, quick-capture, whatfix-ai, beacons, launchers, task-list, popups, segmentation, content-aggregation, mirror, product-analytics, dap-desktop, dap-mobile, dap-core, localization
 - issue_type (Bug, Task, Story, Improvement)
 - triage (Needs Investigation, Confirmed, Cannot Reproduce, Duplicate)
 - environment (string)
@@ -193,6 +197,8 @@ IMPORTANT:
 - If the user says "add X to description" or "in description add X", APPEND the text to the existing description value.
 - If the user says "change description to X", REPLACE the description entirely.
 - Same logic for any field: "add to" = append, "change to" / "set to" = replace.
+- If the user says "this is for quick capture team" or "assign to flows", update components and labels accordingly.
+- If the user mentions an ENT ID (e.g. "ent id 12345"), add it to description and add "customer-reported" to labels.
 - Return ONLY valid JSON with field names as keys and new values as strings.
 - Return EMPTY object {} if you cannot determine any edits.`;
 
@@ -421,6 +427,33 @@ app.message(async ({ message, say }) => {
       editingSessions.delete(userId);
       await say(`⚠️ Draft \`${editDraftId}\` not found.`);
       return;
+    }
+
+    // ── Handle file attachments in edit mode ──
+    if (slackFiles && slackFiles.length > 0) {
+      const newAttachments = await extractAttachments(slackFiles);
+      if (newAttachments.length > 0) {
+        draft.issue.attachments = [...(draft.issue.attachments || []), ...newAttachments];
+
+        // Append attachment refs to description
+        const section = newAttachments
+          .map((a) => {
+            const icon = a.mimetype.startsWith('image/') ? '🖼️'
+              : a.mimetype.startsWith('video/') ? '🎥' : '📎';
+            return `${icon} [${a.name}](${a.url})`;
+          })
+          .join('\n');
+        draft.issue.description += `\n\n---\n**Attachments (added via edit):**\n${section}`;
+
+        const names = newAttachments.map(a => a.name).join(', ');
+        // If there's no other text, just confirm and return
+        if (!rawText || rawText.trim() === '' || rawText.toLowerCase().includes('add this') || rawText.toLowerCase().includes('add attachment') || rawText.toLowerCase().includes('add image')) {
+          await say(`📎 Added ${newAttachments.length} attachment(s): *${names}*\n\nSend more edits, or type \`done\` to finish, \`cancel\` to discard.`);
+          return;
+        }
+        // If there IS text alongside files, confirm attachments and continue to parse text edits below
+        await say(`📎 Added ${newAttachments.length} attachment(s): *${names}*`);
+      }
     }
 
     // Parse field edits — try strict format first, then smart/LLM parsing

@@ -7,6 +7,7 @@ export const config = {
   slackAppToken:      process.env.SLACK_APP_TOKEN || '',
   openaiApiKey:       process.env.OPENAI_API_KEY || '',
   claudeApiKey:       process.env.CLAUDE_API_KEY || '',
+  geminiApiKey:       process.env.GEMINI_API_KEY || '',
   confluenceBase:     process.env.CONFLUENCE_BASE || 'http://localhost:4001',
   port:               Number(process.env.PORT) || 3000,
 

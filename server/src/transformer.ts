@@ -1,5 +1,6 @@
 import { config } from './config';
 import { buildWhatfixSystemPrompt } from './whatfixContext';
+import { analyzeMediaWithGemini, hasVisualMedia } from './visionAnalyzer';
 
 // ── Attachment type ──────────────────────────────────────────
 
@@ -41,15 +42,33 @@ export async function transformRawIssue(
 ): Promise<StructuredIssue> {
   let result: StructuredIssue;
 
+  // ── Step 1: If there are images/videos, analyze them with Gemini ──
+  let enrichedRaw = raw;
+  if (attachments.length > 0 && hasVisualMedia(attachments) && config.geminiApiKey) {
+    console.log('[transformer] Visual media detected — analyzing with Gemini...');
+    const visionAnalysis = await analyzeMediaWithGemini(attachments, raw);
+    if (visionAnalysis) {
+      // Combine user text (if any) with Gemini's visual analysis
+      if (raw && raw.trim() && !raw.startsWith('[Attachment:')) {
+        enrichedRaw = `User description: ${raw}\n\n--- Visual Analysis from screenshot/video ---\n${visionAnalysis}`;
+      } else {
+        // No text from user — vision analysis is the sole input
+        enrichedRaw = visionAnalysis;
+      }
+      console.log(`[transformer] Enriched input with Gemini vision (${enrichedRaw.length} chars)`);
+    }
+  }
+
+  // ── Step 2: Structure into Jira ticket with Claude ──
   if (config.claudeApiKey) {
     console.log('[transformer] Using Claude API');
-    result = await transformWithClaude(raw);
+    result = await transformWithClaude(enrichedRaw);
   } else if (config.openaiApiKey) {
     console.log('[transformer] Using OpenAI API');
-    result = await transformWithOpenAI(raw);
+    result = await transformWithOpenAI(enrichedRaw);
   } else {
     console.log('[transformer] No LLM API key set — using mock transform');
-    result = mockTransform(raw);
+    result = mockTransform(enrichedRaw);
   }
 
   // Merge attachments

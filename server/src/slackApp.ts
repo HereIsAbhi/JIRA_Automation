@@ -499,7 +499,18 @@ app.message(async ({ message, say }) => {
 
   // ── New issue mode ──
   console.log('📋 Routing to Issue Creator...');
-  await say('⏳ Processing your issue — hang tight...');
+
+  // Check if there are visual media files for enhanced messaging
+  const hasMedia = slackFiles?.some((f: any) =>
+    f.mimetype?.startsWith('image/') || f.mimetype?.startsWith('video/'),
+  );
+  if (hasMedia && !rawText) {
+    await say('👁️ Analyzing your screenshot/video with AI vision — this may take a moment...');
+  } else if (hasMedia) {
+    await say('👁️ Processing your issue + analyzing visual media...');
+  } else {
+    await say('⏳ Processing your issue — hang tight...');
+  }
 
   try {
     const attachments = await extractAttachments(slackFiles);
